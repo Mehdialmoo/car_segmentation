@@ -2,11 +2,11 @@ from vars.utilities import util
 
 
 class menu():
-    def menu(self):
-        print()
+    def __init__(self) -> None:
+        print("address?")
         self.address = str(input())
         self.ut = util(self.address)
-        print()
+        print("auto/manual?")
         val = str(input()).capitalize()
         if val == "M":
             self.manual()
