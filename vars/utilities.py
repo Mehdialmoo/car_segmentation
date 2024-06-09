@@ -127,3 +127,81 @@ class util ():
             segmented_obj = self.fill_swath_with_neighboring_pixel()
 
         plt.imshow(segmented_obj)
+
+    def fill_swath_with_neighboring_pixel(img, num_iterations=10):
+        img_with_neighbor_filled = img.copy()
+        white_mask = np.all(img == [255, 255, 255], axis=-1)
+
+        for _ in range(num_iterations):
+            white_indices = np.argwhere(white_mask)
+            np.random.shuffle(white_indices)
+
+            for x, y in white_indices:
+                neighboring_pixel = get_neighboring_pixel(
+                    img_with_neighbor_filled, x, y)
+                img_with_neighbor_filled[x, y] = neighboring_pixel
+
+            white_mask = np.all(img_with_neighbor_filled ==
+                                [255, 255, 255], axis=-1)
+
+            if not np.any(white_mask):
+                break
+
+        return img_with_neighbor_filled
+
+    def get_neighboring_pixel(img, x, y, window_size=30):
+        min_x = max(0, x - window_size)
+        max_x = min(img.shape[0], x + window_size + 1)
+        min_y = max(0, y - window_size)
+        max_y = min(img.shape[1], y + window_size + 1)
+
+        window = img[min_x:max_x, min_y:max_y]
+        non_white_pixels = window[np.where(
+            np.any(window != [255, 255, 255], axis=-1))]
+
+        if len(non_white_pixels) > 0:
+            random_pixel = non_white_pixels[np.random.choice(
+                len(non_white_pixels))]
+            return random_pixel
+        else:
+            return img[x, y]
+
+    def auto_mask():
+
+        # Define the transformation
+        transform_resize = transforms.Compose([
+            transforms.Resize((32, 32))
+        ])
+
+        # Select the car mask automatically
+
+        car_masks = []
+        model_inputs = []
+        for n, mask in enumerate(masks):
+            image_tensor = transform(image)
+            bb_x = mask['bbox'][0]
+            bb_y = mask['bbox'][1]
+            bb_w = mask['bbox'][2]
+            bb_h = mask['bbox'][3]
+            image_crop = transform_resize(
+                image_tensor[:, bb_y: bb_y + bb_h, bb_x: bb_x + bb_w])
+
+            output = car_detect_network(image_crop)
+            _, predicted = torch.max(output.data, 1)
+            if predicted.item() == 1:  # Automobile class
+                car_masks.append(mask['segmentation'])
+                print(f"found car at position {n}")
+
+        # Plot the car masks on the source image
+        if len(car_masks) > 0:
+            masked_image = image.copy()
+            for car_mask in car_masks:
+                # Set the mask pixels to white
+                masked_image[car_mask] = [255, 255, 255]
+
+            plt.figure(figsize=(10, 10))
+            plt.imshow(masked_image)
+            plt.axis('off')
+            plt.show()
+        else:
+            print("No cars detected in the image.")
